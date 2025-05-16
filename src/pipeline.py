@@ -1,17 +1,15 @@
-import os
 import joblib
 import spacy
 import torch
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 from typing import List, Dict, Any
 from pydantic import BaseModel
-from fastapi import HTTPException
 
-TFIDF_PIPELINE_PATH = '../models/tfidf_svc_pipeline(best).joblib'
-TRANSFORMER_MODEL_DIR = '../models/bert'
-LABEL_MAP_PATH = '../models/label_map.joblib'
+TFIDF_PIPELINE_PATH = 'models/tfidf_svc_pipeline(best).joblib'
+TRANSFORMER_MODEL_DIR = 'models/bert'
+LABEL_MAP_PATH = 'models/label_map.joblib'
 
-baseline_pipeline = joblib.load('../models/tfidf_svc_pipeline(best).joblib')
+baseline_pipeline = joblib.load('models/tfidf_svc_pipeline(best).joblib')
 
 tokenizer = AutoTokenizer.from_pretrained(TRANSFORMER_MODEL_DIR)
 transformer = AutoModelForSequenceClassification.from_pretrained(TRANSFORMER_MODEL_DIR)
@@ -63,7 +61,6 @@ def predict_transformer(texts: List[str], device: str = "cpu") -> List[Dict[str,
     Run fine-tuned transformer model.
     Returns list of dicts: {"label": str, "proba": float}
     """
-    # Basic normalization: lowercasing
     normalized = [t.lower().strip() for t in texts]
     inputs = tokenizer(
         normalized,
@@ -96,13 +93,17 @@ class PredictResponse(BaseModel):
     predictions: List[Dict[str, Any]]
 
 
+class UnknownModelError(ValueError):
+    pass
+
+
 def predict(request: PredictRequest) -> PredictResponse:
     if request.model == "baseline":
         preds = predict_baseline([request.text])
     elif request.model == "transformer":
         preds = predict_transformer([request.text])
     else:
-        raise HTTPException(status_code=400, detail=f"Unknown model '{request.model}'")
+        raise UnknownModelError(f"Unknown model '{request.model}'")
     return PredictResponse(predictions=preds)
 
 
@@ -113,7 +114,7 @@ if __name__ == "__main__":
     def cli(text: str, model: str = "transformer"):
         req = PredictRequest(text=text, model=model)
         resp = predict(req)
-        print(resp.json(indent=2, ensure_ascii=False))
+        print(resp.model_dump_json(indent=2))
 
 
     fire.Fire(cli)

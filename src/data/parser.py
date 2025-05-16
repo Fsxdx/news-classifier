@@ -10,7 +10,6 @@ import aiohttp
 from aiohttp import ClientResponseError, ClientSession, TCPConnector
 from bs4 import BeautifulSoup
 
-# Configure logger
 logger = logging.getLogger("LentaParser")
 logging.basicConfig(
     level=logging.INFO,
@@ -35,7 +34,6 @@ class AsyncLentaParser:
     ) -> None:
         self.from_date = datetime.strptime(from_date, "%d.%m.%Y").date()
         self.out_csv = out_csv
-        # Use ThreadPoolExecutor to avoid pickle issues with locks
         self.executor = ThreadPoolExecutor(max_workers=max_workers)
         self.timeout = aiohttp.ClientTimeout(total=60)
         self.session: Optional[ClientSession] = None
@@ -47,7 +45,7 @@ class AsyncLentaParser:
         self._csv_file = self.out_csv.open("w", newline="", encoding="utf-8")
         self._writer = csv.DictWriter(
             self._csv_file,
-            fieldnames=["url", "title", "text", "topic", "tags"],
+            fieldnames=["url", "title", "text", "topic", "tags", "date"],
         )
         self._writer.writeheader()
         return self
@@ -106,7 +104,6 @@ class AsyncLentaParser:
 
         urls = self.extract_urls(listing_html)
 
-        # Fetch all article pages concurrently
         fetch_tasks = [self.fetch_html(url) for url in urls]
         pages = await asyncio.gather(*fetch_tasks, return_exceptions=True)
 
@@ -121,6 +118,7 @@ class AsyncLentaParser:
             try:
                 data = await parse_task
                 data["url"] = url
+                data["date"] = date_str
                 logger.info(f"Parsed article: {url}")
                 results.append(data)
             except Exception as e:
@@ -143,17 +141,3 @@ class AsyncLentaParser:
             count = await self.process_day(date_path)
             logger.info(f"Completed date: {date_path}, {count} articles, total={self._downloaded}")
             current += timedelta(days=1)
-
-
-def main() -> None:
-    parser = AsyncLentaParser(from_date="01.01.2025", out_csv=Path("../../data/lenta_news.csv"), max_workers=8)
-    asyncio.run(parser_runner(parser))
-
-
-async def parser_runner(parser: AsyncLentaParser) -> None:
-    async with parser:
-        await parser.run()
-
-
-if __name__ == "__main__":
-    main()
