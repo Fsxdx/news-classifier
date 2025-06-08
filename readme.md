@@ -1,6 +1,6 @@
 ## News Article Topic Classification
 
-A robust NLP pipeline for classifying Russian news articles by topic. This project demonstrates end-to-end
+NLP pipeline for classifying Russian news articles by topic. This project demonstrates end-to-end
 capabilities — from raw data parsing and cleaning through feature engineering, classical baselines, and transformer
 fine-tuning in a reproducible, production-ready model.
 
@@ -18,7 +18,7 @@ This repository contains an end-to-end solution for topic classification of news
 - **Classical baselines** (TF-IDF + Logistic Regression, MultinomialNB, LinearSVC, RandomForest, KNN).
 - **Transformer fine-tuning** with DeepPavlov’s RuBERT (`DeepPavlov/rubert-base-cased`), including class-weighted loss
   for imbalance.
-- **Evaluation** with precision/recall/F1, confusion matrices, macro vs. weighted metrics.
+- **Evaluation** with precision/recall/F1.
 - **Modular Pipeline** definition and serialization.
 
 ---
@@ -42,11 +42,11 @@ Built with scikit-learn Pipelines (TF-IDF → classifier):
 
 | Model                  | Accuracy | Macro-F1 |
 |------------------------|---------:|---------:|
-| Logistic Regression    |   0.7343 |   0.6670 |
-| MultinomialNB          |   0.7284 |   0.6661 |
-| LinearSVC              |   0.6633 |   0.5916 |
-| RandomForestClassifier |   0.4503 |   0.3050 |
-| KNeighborsClassifier   |   0.1473 |   0.1014 |
+| Logistic Regression    | 0.755383 | 0.732552 |
+| MultinomialNB          | 0.692399 | 0.730963 |
+| LinearSVC              | 0.751107 | 0.654706 |
+| RandomForestClassifier | 0.450096 | 0.326722 |
+| KNeighborsClassifier   | 0.152505 | 0.115004 |
 
 Baseline chosen: **Logistic Regression** for best trade-off of speed and performance.
 
@@ -57,50 +57,49 @@ Baseline chosen: **Logistic Regression** for best trade-off of speed and perform
 - **Model**: `DeepPavlov/rubert-base-cased`
 - **Loss**: `CrossEntropyLoss` with class weights
 - **Hyperparameters**:
-    - LR: 2e-5, Batch: 16, Epochs: 3
-    - Warmup steps: 500, Weight decay: 0.01
+    - LR: 1e-5, Batch: 128, Epochs: 4
+    - Warmup steps: 0.05, Weight decay: 0.01
 
-Achieved **Accuracy 0.81**, with macro avg F1 of **0.76**.
+Achieved **Accuracy 0.80**, with macro avg F1 of **0.80**.
 
 ---
 
 ## Results & Final Analysis
 
-Below is a consolidated comparison of all models on the held-out test set:
+| Metric      | TF-IDF + LogReg | RuBERT   | Δ         |
+|-------------|-----------------|----------|-----------|
+| Accuracy    | **0.75**        | **0.80** | **+0.05** |
+| Macro F1    | 0.73            | 0.80     | **+0.07** |
+| Weighted F1 | 0.75            | 0.82     | **+0.07** |
 
-| Model                        |   Accuracy |   Macro-F1 |
-|------------------------------|-----------:|-----------:|
-| Logistic Regression (TF-IDF) |     0.7343 |     0.6670 |
-| MultinomialNB (TF-IDF)       |     0.7284 |     0.6661 |
-| LinearSVC (TF-IDF)           |     0.6633 |     0.5916 |
-| RandomForest (TF-IDF)        |     0.4503 |     0.3050 |
-| KNN (TF-IDF)                 |     0.1473 |     0.1014 |
-| **Best Baseline (LogReg)**   | **0.7343** | **0.6670** |
-| RuBERT Fine-Tuned            |       0.81 |       0.76 |
-
-### Key Takeaways
-
-1. **Transformer vs. Classical**  
-   The BERT-based model (RuBERT) outperforms all classical TF-IDF baselines by ~8 pp in accuracy and ~10 pp in macro-F1,
-   demonstrating strong capacity to capture contextual semantics.
-
-2. **Class Imbalance Handling**  
-   Weighted loss in the transformer training improved recall on minority classes (e.g., “Travels” and “Values”), raising
-   their F1-scores by up to 22 pp compared to unweighted runs.
-
-3. **Baseline Strength**  
-   Among classical models, Logistic Regression delivered the best speed-performance trade-off.
-
-4. **Error Patterns**
-    - **“Business”** remains the hardest to classify consistently, due to vocabulary overlap with
-      “Economy” and “Russia.”
-    - **High-volume classes** like “Sport” and “Former USSR” achieve > 0.89 F1, showing that ample data yields stable
-      performance.
+*Interpretation*: A 5 pp accuracy gain on a 39 k-article test set is statistically very strong. Macro-F1 improves even
+more, confirming that rare classes benefit most.
 
 ---
 
+### Class-level insights
+
+| Label (support)       | Biggest change                                 | Comments                                                                                                 |
+|-----------------------|------------------------------------------------|----------------------------------------------------------------------------------------------------------|
+| **Путешествия**       | Recall 0.42 → 0.86, <br/>F1 0.58 → 0.80        | Contextual clues (“flight”, “visa”, country names) are captured by BERT but lost in sparse TF-IDF space. |
+| **Силовые структуры** | Recall 0.40 → 0.86, <br/>F1 0.44 → 0.59        | BERT recognizes entity patterns (“FSB”, “ МВД ”) but precision remains low.                              |
+| **Дом**               | Precision 0.75 → 0.54, <br/>F1 0.78 → 0.67     | Small class, many lifestyle words overlap with *Values* and *Life*.                                      |
+| **Мир**               | Precision 0.80 → 0.93, <br/>Recall 0.79 → 0.76 | BERT is stricter: fewer false positives, more false negatives.                                           |
+| **Спорт**             | Near-perfect both models (0.96 vs 0.98)        | High lexical uniqueness; baseline already saturated.                                                     |
+
+
+---
+
+### Practical implications
+
+| Aspect                        | TF-IDF + LogReg | RuBERT                  |
+|-------------------------------|-----------------|-------------------------|
+| Training time                 | Minutes on CPU  | \~2.5 h on single GPU   |
+| Inference latency (batch = 1) | 2 ms            | 25 - 35 ms              |
+| Memory                        | 200 MB          | 425 MB                  |
+| Maintenance                   | Simple re-train | Need GPU & HF ecosystem |
+
 ## Pipeline & Deployment
 
-- **Data collection code** in `src/collect_data.py`
-- **Pipeline code** in `src/pipeline.py`
-- **Serialization** via `joblib` (classical) and `model.save_pretrained()` (transformer)  
+- **Data collection code** in `src/data/collect_data.py`
+- **Pipeline code** in `src/data/pipeline.py`

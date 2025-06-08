@@ -43,8 +43,6 @@ def predict_baseline(texts: List[str]) -> List[Dict[str, Any]]:
     Run TF-IDF + classical classifier pipeline.
     Returns list of dicts: {"label": str, "proba": float}
     """
-    # Ensure texts are preprocessed via the same tokenizer
-    # Pipeline should include TfidfVectorizer(tokenizer=SpacyTokenizerWrapper())
     probs = baseline_pipeline.predict_proba(texts)
     preds = baseline_pipeline.predict(texts)
     results = []
