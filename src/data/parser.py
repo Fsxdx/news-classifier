@@ -83,7 +83,7 @@ class AsyncLentaParser:
         body = soup.select('div.topic-body__content')
         if not body:
             raise ValueError("Article body not found")
-        text = "\n".join(p.get_text(strip=True) for p in body[0].find_all("p"))
+        text = "\n".join(p.get_text() for p in body[0].find_all("p"))
 
         return {"title": title, "text": text, "topic": topic, "tags": tags}
 
